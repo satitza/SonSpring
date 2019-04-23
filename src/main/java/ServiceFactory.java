@@ -1,4 +1,3 @@
-
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -7,44 +6,72 @@ import java.time.Instant;
 
 public interface ServiceFactory {
 
-
     static Object createService(final Object realObject) {
 
         final ClassLoader classLoader = realObject.getClass().getClassLoader();
         final Class[] classes = realObject.getClass().getInterfaces();
 
-        Object object = Proxy.newProxyInstance(classLoader, classes, new InvocationHandler() {
+        return Proxy.newProxyInstance(classLoader, classes, (proxy, method, args) -> {
 
-            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            ExcuteTime excuteTime = realObject.getClass().getMethod(method.getName(), method.getParameterTypes()).getAnnotation(ExcuteTime.class);
+            Object object;
 
-                Method method1 = realObject.getClass().getMethod(method.getName(), method.getParameterTypes());
-                Object object;
+            if (excuteTime.printExcuteTime()) {
 
-                if (method1.getAnnotation(ExcuteTime.class) != null) {
+                Instant start = Instant.now();
 
-                    Instant start = Instant.now();
+                object = method.invoke(realObject, args);
 
-                    object = method.invoke(realObject, args);
+                Instant finish = Instant.now();
 
-                    Instant finish = Instant.now();
+                long timeElapsed = Duration.between(start, finish).toMillis();
+                System.out.println("Method : " + method.getName() + " excute success in : " + timeElapsed + " ms.");
 
-                    long timeElapsed = Duration.between(start, finish).toMillis();
-                    System.out.println("Method : " + method.getName() + " excute success in : " + timeElapsed + " ms.");
+            } else {
 
-                } else {
+                object = method.invoke(realObject, args);
 
-                    object = method.invoke(realObject, args);
-
-                }
-
-                return object;
             }
 
+            return object;
+
         });
-
-        return object;
-
     }
 
+    static Object createService(final Class realClass) throws IllegalAccessException, InstantiationException, ClassNotFoundException {
+
+        Object object;
+        Class c = Class.forName(realClass.getName());
+        object = c.newInstance();
+
+        final ClassLoader classLoader = object.getClass().getClassLoader();
+        final Class[] classes = object.getClass().getInterfaces();
+
+        return Proxy.newProxyInstance(classLoader, classes, (proxy, method, args) -> {
+
+            ExcuteTime excuteTime = object.getClass().getMethod(method.getName(), method.getParameterTypes()).getAnnotation(ExcuteTime.class);
+            Object objectInner;
+
+            if (excuteTime.printExcuteTime()) {
+
+                Instant start = Instant.now();
+
+                objectInner = method.invoke(object, args);
+
+                Instant finish = Instant.now();
+
+                long timeElapsed = Duration.between(start, finish).toMillis();
+                System.out.println("Method : " + method.getName() + " excute success in : " + timeElapsed + " ms.");
+
+            } else {
+
+                objectInner = method.invoke(object, args);
+
+            }
+
+            return objectInner;
+        });
+
+    }
 
 }
